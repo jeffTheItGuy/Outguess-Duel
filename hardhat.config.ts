@@ -12,13 +12,11 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    // The ephemeral in-memory chain (used when you run `npx hardhat test`)
     hardhat: {
       chainId: 31337,
     },
-    // The persistent node (used when you run `npx hardhat node`)
     localhost: {
-      url: "http://127.0.0.1:8545",
+      url: process.env.LOCAL_RPC_URL ?? "http://127.0.0.1:8545",
       chainId: 31337,
     },
   },
