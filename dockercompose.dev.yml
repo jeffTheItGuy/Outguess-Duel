@@ -1,0 +1,84 @@
+name: outguess-duel-dev
+
+services:
+  setup:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - frontend_node_modules:/app/frontend/node_modules
+    command: sh -c "npm install --no-audit --no-fund"
+    restart: "no"
+
+  chain:
+    image: node:20-bookworm-slim
+    init: true
+    working_dir: /app
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    environment:
+      RPC_URL: http://127.0.0.1:8545
+    command: npx hardhat node --hostname 0.0.0.0 --port 8545
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test: ["CMD", "node", "scripts/rpc-healthcheck.mjs"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  contracts:
+    image: node:20-bookworm-slim
+    init: true
+    working_dir: /app
+    depends_on:
+      chain:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - frontend_node_modules:/app/frontend/node_modules
+    environment:
+      RPC_URL: http://chain:8545
+      LOCAL_RPC_URL: http://chain:8545
+      PUBLIC_RPC_URL: http://localhost:8545
+      HARDHAT_NETWORK: localhost
+      CHOKIDAR_USEPOLLING: "true"
+      POLL_MS: "2000"
+      DEBOUNCE_MS: "1000"
+    command: node scripts/watch-deploy.mjs
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/deploy-ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  frontend:
+    image: node:20-bookworm-slim
+    init: true
+    working_dir: /app/frontend
+    depends_on:
+      contracts:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - frontend_node_modules:/app/frontend/node_modules
+    environment:
+      VITE_RPC_URL: http://localhost:8545
+      VITE_CHAIN_ID: "31337"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    command: sh -c "npm run dev -- --host 0.0.0.0 --port 5173"
+
+volumes:
+  node_modules:
+  frontend_node_modules:
