@@ -17,4 +17,7 @@ export interface GameState {
   player2: string | null
   winner: string | null
   myCommitHash: string | null
+  requiredStake: string | null
+  requiredStakeIsSet: boolean
+  myHasStaked: boolean
 }

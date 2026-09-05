@@ -1,5 +1,4 @@
 name: outguess-duel-dev
-
 services:
   setup:
     image: node:20-bookworm-slim
@@ -59,6 +58,28 @@ services:
       timeout: 5s
       retries: 60
       start_period: 30s
+
+  bot:
+    image: node:20-bookworm-slim
+    init: true
+    working_dir: /app
+    depends_on:
+      contracts:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    environment:
+      RPC_URL: http://chain:8545
+      CONTRACT_ADDRESS: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      # Hardhat Account #1 (Different from MetaMask Account #0)
+      BOT_PRIVATE_KEY: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+      PORT: "4000"
+      POLL_INTERVAL_MS: "3000"
+      STAKE_AMOUNT_ETH: "0.01"
+    ports:
+      - "4000:4000"
+    command: npx ts-node backend/src/server.ts
 
   frontend:
     image: node:20-bookworm-slim

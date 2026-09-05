@@ -8,37 +8,50 @@ export function useWallet() {
   const [isConnected, setIsConnected] = useState(false)
 
   const connect = useCallback(async () => {
-    if (!window.ethereum) {
+    const ethereum = window.ethereum
+
+    if (!ethereum) {
       alert('MetaMask not detected')
       return
     }
 
-    const provider = new BrowserProvider(window.ethereum)
+    const provider = new BrowserProvider(ethereum)
     const network = await provider.getNetwork()
 
     if (Number(network.chainId) !== CONFIG.chainId) {
       try {
-        await window.ethereum.request({
+        await ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x' + CONFIG.chainId.toString(16) }],
+          params: [{ chainId: `0x${CONFIG.chainId.toString(16)}` }],
         })
       } catch (switchError: any) {
         if (switchError.code === 4902) {
-          await window.ethereum.request({
+          await ethereum.request({
             method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0x' + CONFIG.chainId.toString(16),
-              chainName: CONFIG.chainName,
-              rpcUrls: [CONFIG.rpcUrl],
-              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-            }],
+            params: [
+              {
+                chainId: `0x${CONFIG.chainId.toString(16)}`,
+                chainName: CONFIG.chainName,
+                rpcUrls: [CONFIG.rpcUrl],
+                nativeCurrency: {
+                  name: 'ETH',
+                  symbol: 'ETH',
+                  decimals: 18,
+                },
+              },
+            ],
           })
         }
       }
     }
 
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
-    const newProvider = new BrowserProvider(window.ethereum)
+    const accounts = await ethereum.request({
+      method: 'eth_requestAccounts',
+    }) as string[]
+
+    if (!accounts.length) return
+
+    const newProvider = new BrowserProvider(ethereum)
     const newSigner = await newProvider.getSigner()
 
     setAccount(accounts[0])
@@ -53,18 +66,30 @@ export function useWallet() {
   }, [])
 
   useEffect(() => {
-    if (!window.ethereum) return
+    const ethereum = window.ethereum
+
+    if (!ethereum) return
 
     const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length === 0) disconnect()
-      else setAccount(accounts[0])
+      if (accounts.length === 0) {
+        disconnect()
+      } else {
+        setAccount(accounts[0])
+      }
     }
 
-    window.ethereum.on('accountsChanged', handleAccountsChanged)
+    ethereum.on('accountsChanged', handleAccountsChanged)
+
     return () => {
-      window.ethereum.removeListener('accountsChanged', handleAccountsChanged)
+      ethereum.removeListener('accountsChanged', handleAccountsChanged)
     }
   }, [disconnect])
 
-  return { account, signer, isConnected, connect, disconnect }
+  return {
+    account,
+    signer,
+    isConnected,
+    connect,
+    disconnect,
+  }
 }
