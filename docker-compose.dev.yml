@@ -59,6 +59,20 @@ services:
       retries: 60
       start_period: 30s
 
+  # 👇 Automatically funds the bot wallet on startup
+  fund-bot:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    depends_on:
+      chain:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    environment:
+      RPC_URL: http://chain:8545
+    command: node scripts/fund-bot.mjs
+    restart: "no"
+
   bot:
     image: node:20-bookworm-slim
     init: true
@@ -66,17 +80,19 @@ services:
     depends_on:
       contracts:
         condition: service_healthy
+      # 👇 REMOVED the fund-bot dependency
     volumes:
       - .:/app
       - node_modules:/app/node_modules
     environment:
       RPC_URL: http://chain:8545
-      CONTRACT_ADDRESS: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-      # Hardhat Account #1 (Different from MetaMask Account #0)
+      CONTRACT_ADDRESS: "auto"
       BOT_PRIVATE_KEY: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
       PORT: "4000"
       POLL_INTERVAL_MS: "3000"
       STAKE_AMOUNT_ETH: "0.01"
+      BOT_AUTO_RESTART: "true"
+      RESULT_VIEW_MS: "15000"
     ports:
       - "4000:4000"
     command: npx ts-node backend/src/server.ts

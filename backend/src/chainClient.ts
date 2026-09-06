@@ -1,19 +1,24 @@
 import { Contract, JsonRpcProvider, Wallet } from 'ethers'
-import { CONFIG } from './config'
+import { CONFIG, getContractAddress } from './config'
 import ABI from './abi/OutguessDuel.json'
-import erc20Abi from './abi/ERC20.json'
-
-export const ERC20_ABI = erc20Abi
 
 export const provider = new JsonRpcProvider(CONFIG.rpcUrl)
-
 export const botWallet = new Wallet(CONFIG.botPrivateKey, provider)
 
-export const botContract = new Contract(
-  CONFIG.contractAddress,
-  ABI,
-  botWallet
-)
+let cachedContract: Contract | null = null
+let cachedAddress = ''
+
+export function getBotContract(): Contract {
+  const address = getContractAddress()
+
+  if (!cachedContract || cachedAddress !== address) {
+    cachedAddress = address
+    cachedContract = new Contract(address, ABI, botWallet)
+    console.log('[bot] using contract address:', address)
+  }
+
+  return cachedContract
+}
 
 export async function getBotAddress(): Promise<string> {
   return botWallet.getAddress()

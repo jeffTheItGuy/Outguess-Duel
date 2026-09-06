@@ -4,28 +4,6 @@ import { CONFIG } from '@/config'
 import ABI from '@/abi/OutguessDuel.json'
 import { GameState } from '@/types/game'
 
-async function readStakeAmount(contract: Contract): Promise<bigint> {
-  const anyContract = contract as any
-
-  // If your contract actually has requiredStake(), you can add it to the ABI.
-  // Otherwise, fall back to stakeAmount().
-  if (typeof anyContract.requiredStake === 'function') {
-    try {
-      const value = BigInt(await anyContract.requiredStake())
-      if (value > 0n) return value
-    } catch {}
-  }
-
-  if (typeof anyContract.stakeAmount === 'function') {
-    try {
-      const value = BigInt(await anyContract.stakeAmount())
-      if (value > 0n) return value
-    } catch {}
-  }
-
-  return 0n
-}
-
 export function useGameState(signer: JsonRpcSigner | null) {
   const [state, setState] = useState<GameState>({
     phase: 'idle',
@@ -51,6 +29,7 @@ export function useGameState(signer: JsonRpcSigner | null) {
       const [
         phaseRaw,
         potRaw,
+        requiredStakeRaw,
         commitEnd,
         revealEnd,
         p1,
@@ -60,6 +39,7 @@ export function useGameState(signer: JsonRpcSigner | null) {
       ] = await Promise.all([
         contract.gamePhase(),
         contract.pot(),
+        contract.requiredStake(),
         contract.commitWindowEnd(),
         contract.revealWindowEnd(),
         contract.player1(),
@@ -68,15 +48,14 @@ export function useGameState(signer: JsonRpcSigner | null) {
         contract.players(address),
       ])
 
-      const stakeAmountRaw = await readStakeAmount(contract)
-
       const phaseMap = ['idle', 'commit', 'reveal', 'finished'] as const
+      const requiredStakeBig = BigInt(requiredStakeRaw)
 
       setState({
         phase: phaseMap[Number(phaseRaw)] ?? 'idle',
         pot: formatEther(potRaw),
-        requiredStake: formatEther(stakeAmountRaw),
-        requiredStakeIsSet: stakeAmountRaw > 0n,
+        requiredStake: formatEther(requiredStakeBig),
+        requiredStakeIsSet: requiredStakeBig > 0n,
         commitDeadline: Number(commitEnd) > 0 ? Number(commitEnd) : null,
         revealDeadline: Number(revealEnd) > 0 ? Number(revealEnd) : null,
         player1:

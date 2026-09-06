@@ -8,15 +8,39 @@ interface BotStatus {
 export function useBot() {
   const [botStatus, setBotStatus] = useState<BotStatus | null>(null)
   const [starting, setStarting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const startBot = useCallback(async () => {
     setStarting(true)
+    setError(null)
+
     try {
       const res = await fetch('/api/bot/start-match', { method: 'POST' })
-      const data = await res.json()
+      const text = await res.text()
+
+      let data: any = null
+      try {
+        data = text ? JSON.parse(text) : null
+      } catch {
+        // Response wasn't JSON — likely a proxy error page (502/404/etc.)
+      }
+
+      if (!res.ok) {
+        const message =
+          data?.error ||
+          data?.message ||
+          text ||
+          `Bot request failed with status ${res.status}`
+        throw new Error(message)
+      }
+
       console.log('[frontend] bot started:', data)
-    } catch (err) {
-      console.error('[frontend] failed to start bot:', err)
+      return data
+    } catch (err: any) {
+      const message = err?.message || 'Failed to start bot'
+      console.error('[frontend] failed to start bot:', message)
+      setError(message)
+      throw err
     } finally {
       setStarting(false)
     }
@@ -32,5 +56,5 @@ export function useBot() {
     }
   }, [])
 
-  return { botStatus, starting, startBot, getBotStatus }
+  return { botStatus, starting, error, startBot, getBotStatus }
 }
