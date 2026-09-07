@@ -6,6 +6,8 @@ interface Props {
   isStaked: boolean
   requiredStake: string | null
   requiredStakeIsSet: boolean
+  canUnstake?: boolean
+  onUnstake?: () => void
 }
 
 export default function StakePanel({
@@ -14,6 +16,8 @@ export default function StakePanel({
   isStaked,
   requiredStake,
   requiredStakeIsSet,
+  canUnstake = false,
+  onUnstake,
 }: Props) {
   const [amount, setAmount] = useState(requiredStake ?? '0.01')
 
@@ -99,9 +103,28 @@ export default function StakePanel({
           </button>
         </>
       ) : (
-        <p style={{ color: '#22c55e' }}>
-          You are staked. Waiting for opponent...
-        </p>
+        <>
+          <p style={{ color: '#22c55e' }}>
+            You are staked. Waiting for opponent...
+          </p>
+
+          {canUnstake && onUnstake && (
+            <button
+              onClick={onUnstake}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#dc2626',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Unstake
+            </button>
+          )}
+        </>
       )}
     </div>
   )

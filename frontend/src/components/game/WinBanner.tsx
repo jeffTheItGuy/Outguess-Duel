@@ -5,6 +5,7 @@ interface Props {
   account?: string | null
   isPrevious?: boolean
   onDismiss?: () => void
+  onShowDetails?: () => void
 }
 
 export default function WinnerBanner({
@@ -14,6 +15,7 @@ export default function WinnerBanner({
   account,
   isPrevious,
   onDismiss,
+  onShowDetails,
 }: Props) {
   if (!result) return null
 
@@ -27,7 +29,7 @@ export default function WinnerBanner({
   const messages = {
     win: 'You Win!',
     lose: 'You Lose',
-    tie: 'Exact Tie — Pot Split',
+    tie: 'Distance Tie — Pot Split',
     timeout: 'Opponent Timed Out',
   }
 
@@ -93,7 +95,7 @@ export default function WinnerBanner({
             fontSize: '0.875rem',
           }}
         >
-          No winner — the pot was split.
+          No winner — both players were equally close, so the pot was split.
         </p>
       )}
 
@@ -103,22 +105,49 @@ export default function WinnerBanner({
         </p>
       )}
 
-      {onDismiss && (
-        <button
-          onClick={onDismiss}
+      {(onShowDetails || onDismiss) && (
+        <div
           style={{
             marginTop: '0.75rem',
-            padding: '0.4rem 0.8rem',
-            background: '#222',
-            color: '#fff',
-            border: '1px solid #444',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '0.75rem',
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '0.5rem',
           }}
         >
-          Dismiss
-        </button>
+          {onShowDetails && (
+            <button
+              onClick={onShowDetails}
+              style={{
+                padding: '0.4rem 0.8rem',
+                background: '#111',
+                color: '#fff',
+                border: '1px solid #444',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+              }}
+            >
+              Match Details
+            </button>
+          )}
+
+          {onDismiss && (
+            <button
+              onClick={onDismiss}
+              style={{
+                padding: '0.4rem 0.8rem',
+                background: '#222',
+                color: '#fff',
+                border: '1px solid #444',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+              }}
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

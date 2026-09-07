@@ -16,13 +16,25 @@ export default function WinnerBanner({ result, payout }: Props) {
   const messages = {
     win: 'You Win!',
     lose: 'You Lose',
-    tie: 'Exact Tie — Pot Split',
+    tie: 'Distance Tie — Pot Split',
     timeout: 'Opponent Timed Out',
   }
 
   return (
-    <div style={{ padding: '1.5rem', background: styles[result].bg, border: `1px solid ${styles[result].text}`, borderRadius: '8px', marginBottom: '1rem', textAlign: 'center' }}>
-      <h2 style={{ margin: '0 0 0.5rem', color: styles[result].text }}>{messages[result]}</h2>
+    <div
+      style={{
+        padding: '1.5rem',
+        background: styles[result].bg,
+        border: `1px solid ${styles[result].text}`,
+        borderRadius: '8px',
+        marginBottom: '1rem',
+        textAlign: 'center',
+      }}
+    >
+      <h2 style={{ margin: '0 0 0.5rem', color: styles[result].text }}>
+        {messages[result]}
+      </h2>
+
       {payout && <p style={{ margin: 0, color: '#fff' }}>Payout: {payout} ETH</p>}
     </div>
   )

@@ -75,6 +75,33 @@ contract OutguessDuel {
         }
     }
 
+    function unstake() external {
+        require(gamePhase == Phase.Idle, "Can only unstake while idle");
+
+        Player storage p = players[msg.sender];
+        require(p.hasStaked, "No stake to withdraw");
+
+        uint256 amount = requiredStake;
+        require(amount > 0, "No stake amount set");
+        require(pot >= amount, "Pot too low");
+
+        if (player1 == msg.sender) {
+            player1 = address(0);
+        } else if (player2 == msg.sender) {
+            player2 = address(0);
+        }
+
+        delete players[msg.sender];
+
+        pot -= amount;
+
+        if (player1 == address(0) && player2 == address(0)) {
+            requiredStake = 0;
+        }
+
+        _pay(msg.sender, amount);
+    }
+
     function commit(bytes32 hash) external {
         require(gamePhase == Phase.Commit, "Not in commit phase");
         require(_isPlayer(msg.sender), "Not a player");
@@ -220,13 +247,13 @@ contract OutguessDuel {
         Player storage p1 = players[player1];
         Player storage p2 = players[player2];
 
-        bool p1Correct = p1.guess == p2.secret;
-        bool p2Correct = p2.guess == p1.secret;
+        uint256 p1Distance = _absDiff(p1.guess, p2.secret);
+        uint256 p2Distance = _absDiff(p2.guess, p1.secret);
 
-        if (p1Correct && !p2Correct) {
+        if (p1Distance < p2Distance) {
             winner = player1;
             _pay(player1, payout);
-        } else if (p2Correct && !p1Correct) {
+        } else if (p2Distance < p1Distance) {
             winner = player2;
             _pay(player2, payout);
         } else {
@@ -259,7 +286,6 @@ contract OutguessDuel {
 
     function _refundBothAndReset() internal {
         uint256 payout = pot;
-
         pot = 0;
 
         uint256 refund1;
@@ -294,13 +320,10 @@ contract OutguessDuel {
         }
 
         gamePhase = Phase.Idle;
-
         pot = 0;
         requiredStake = 0;
-
         commitWindowEnd = 0;
         revealWindowEnd = 0;
-
         player1 = address(0);
         player2 = address(0);
         winner = address(0);
@@ -317,5 +340,9 @@ contract OutguessDuel {
 
     function _isPlayer(address addr) internal view returns (bool) {
         return players[addr].isPlayer;
+    }
+
+    function _absDiff(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a >= b ? a - b : b - a;
     }
 }

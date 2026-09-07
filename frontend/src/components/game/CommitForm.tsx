@@ -19,6 +19,7 @@ export default function CommitForm({ onCommit, hashPreview }: Props) {
       Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('')
+
     setSalt(randomSalt)
   }
 
@@ -66,9 +67,11 @@ export default function CommitForm({ onCommit, hashPreview }: Props) {
       }}
     >
       <h3 style={{ marginTop: 0 }}>Commit Phase</h3>
+
       <p style={{ color: '#888', fontSize: '0.875rem' }}>
         Pick a number between 0 and {MAX_GAME_VALUE}, then guess your
-        opponent&apos;s number.
+        opponent&apos;s number. The closest guess to the opponent&apos;s number
+        wins.
       </p>
 
       <label
@@ -80,6 +83,7 @@ export default function CommitForm({ onCommit, hashPreview }: Props) {
       >
         Your Secret Number (0–{MAX_GAME_VALUE})
       </label>
+
       <input
         type="number"
         min={0}
@@ -99,6 +103,7 @@ export default function CommitForm({ onCommit, hashPreview }: Props) {
       >
         Your Guess of Opponent&apos;s Number (0–{MAX_GAME_VALUE})
       </label>
+
       <input
         type="number"
         min={0}
@@ -118,6 +123,7 @@ export default function CommitForm({ onCommit, hashPreview }: Props) {
       >
         Salt
       </label>
+
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <input
           type="text"
@@ -133,6 +139,7 @@ export default function CommitForm({ onCommit, hashPreview }: Props) {
             fontSize: '0.75rem',
           }}
         />
+
         <button
           onClick={handleGenerateSalt}
           style={{

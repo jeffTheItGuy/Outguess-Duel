@@ -1,10 +1,10 @@
-// frontend/src/hooks/useOutguessDuel.ts
-
 import { useCallback } from 'react'
 import { Contract, JsonRpcSigner, parseEther } from 'ethers'
+
 import { CONFIG } from '@/config'
 import ABI from '@/abi/OutguessDuel.json'
 import ERC20_ABI from '@/abi/ERC20.json'
+
 import { hashCommit } from '@/utils/hashing'
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
@@ -16,6 +16,7 @@ function getRevertReason(err: any): string {
   if (err?.error?.message) return err.error.message
   if (err?.info?.error?.message) return err.info.error.message
   if (err?.message) return err.message
+
   return 'Transaction failed'
 }
 
@@ -26,14 +27,18 @@ async function readStakeAmount(contract: Contract): Promise<bigint | null> {
     try {
       const value = BigInt(await anyContract.requiredStake())
       if (value > 0n) return value
-    } catch {}
+    } catch {
+      // Ignore and try fallback.
+    }
   }
 
   if (typeof anyContract.stakeAmount === 'function') {
     try {
       const value = BigInt(await anyContract.stakeAmount())
       if (value > 0n) return value
-    } catch {}
+    } catch {
+      // Ignore and fallback.
+    }
   }
 
   return null
@@ -42,6 +47,7 @@ async function readStakeAmount(contract: Contract): Promise<bigint | null> {
 export function useOutguessDuel(signer: JsonRpcSigner | null) {
   const getContract = useCallback(() => {
     if (!signer) throw new Error('Wallet not connected')
+
     return new Contract(CONFIG.contractAddress, ABI, signer)
   }, [signer])
 
@@ -54,7 +60,10 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
 
         try {
           tokenAddress = await contract.token()
-        } catch {}
+        } catch {
+          // Contract probably does not have a token() function.
+          // Treat as native ETH staking.
+        }
 
         const isErc20 = Boolean(
           tokenAddress && tokenAddress !== ZERO_ADDRESS
@@ -65,7 +74,12 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
           amount && Number(amount) > 0 ? parseEther(amount) : 0n
 
         if (isErc20 && tokenAddress) {
-          const tokenContract = new Contract(tokenAddress, ERC20_ABI, signer)
+          const tokenContract = new Contract(
+            tokenAddress,
+            ERC20_ABI,
+            signer
+          )
+
           const stakeAmount = onchainStakeAmount ?? fallbackAmount
 
           if (stakeAmount <= 0n) {
@@ -76,10 +90,12 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
             CONFIG.contractAddress,
             stakeAmount
           )
+
           await approveTx.wait()
 
           const tx = await contract.stake()
           await tx.wait()
+
           return
         }
 
@@ -93,14 +109,16 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
         const tx = await contract.stake({ value })
         await tx.wait()
       } catch (err: any) {
-        // If the user rejected the MetaMask popup, don't treat it as a contract error
+        // If the user rejected the MetaMask popup, don't treat it as a contract error.
         if (err?.code === 'ACTION_REJECTED' || err?.code === 4001) {
           throw new Error('Transaction rejected in MetaMask')
         }
 
         const reason = getRevertReason(err)
+
         console.error('[stake] failed:', reason)
         console.error('[stake] full error:', err)
+
         throw new Error(reason)
       }
     },
@@ -113,8 +131,10 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
 
       try {
         const hash = hashCommit(secret, guess, salt)
+
         const tx = await contract.commit(hash)
         await tx.wait()
+
         return hash
       } catch (err: any) {
         if (err?.code === 'ACTION_REJECTED' || err?.code === 4001) {
@@ -122,8 +142,10 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
         }
 
         const reason = getRevertReason(err)
+
         console.error('[commit] failed:', reason)
         console.error('[commit] full error:', err)
+
         throw new Error(reason)
       }
     },
@@ -143,8 +165,10 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
         }
 
         const reason = getRevertReason(err)
+
         console.error('[reveal] failed:', reason)
         console.error('[reveal] full error:', err)
+
         throw new Error(reason)
       }
     },
@@ -163,11 +187,46 @@ export function useOutguessDuel(signer: JsonRpcSigner | null) {
       }
 
       const reason = getRevertReason(err)
+
       console.error('[claimTimeout] failed:', reason)
       console.error('[claimTimeout] full error:', err)
+
       throw new Error(reason)
     }
   }, [getContract])
 
-  return { stake, commit, reveal, claimTimeout }
+  const unstake = useCallback(async () => {
+    const contract = getContract()
+    const anyContract = contract as any
+
+    try {
+      if (typeof anyContract.unstake !== 'function') {
+        throw new Error(
+          'unstake() is not available. Add unstake to your ABI and redeploy the contract.'
+        )
+      }
+
+      const tx = await anyContract.unstake()
+      await tx.wait()
+    } catch (err: any) {
+      if (err?.code === 'ACTION_REJECTED' || err?.code === 4001) {
+        throw new Error('Transaction rejected in MetaMask')
+      }
+
+      const reason = getRevertReason(err)
+
+      console.error('[unstake] failed:', reason)
+      console.error('[unstake] full error:', err)
+
+      throw new Error(reason)
+    }
+  }, [getContract])
+
+  return {
+    stake,
+    commit,
+    reveal,
+    claimTimeout,
+    unstake,
+  }
 }
