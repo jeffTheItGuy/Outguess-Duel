@@ -12,7 +12,6 @@ import { useOutguessDuel } from '@/hooks/useOutguessDuel'
 import { useBot } from '@/hooks/useBot'
 import { CONFIG } from '@/config'
 import ABI from '@/abi/OutguessDuel.json'
-
 import Header from '@/components/layout/Header'
 import GameContainer from '@/components/layout/GameContainer'
 import ConnectButton from '@/components/wallet/ConnectButton'
@@ -305,24 +304,33 @@ export default function App() {
     useState<LastFinishedResult | null>(null)
   const [unstaking, setUnstaking] = useState(false)
   const [unstakeError, setUnstakeError] = useState<string | null>(null)
-
   const [startMode, setStartMode] = useState<StartMode>('menu')
+  const [showDebugInfo, setShowDebugInfo] = useState(false)
+
   const prevCanStartNewMatch = useRef(false)
 
   // Ref to track state without causing modal re-fetches on 3s polling updates
   const stateRef = useRef(state)
-
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  const gameSectionRef = useRef<HTMLDivElement | null>(null)
+
+  const scrollToGame = useCallback(() => {
+    gameSectionRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }, [])
 
   const [detailsSource, setDetailsSource] = useState<DetailsSource>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [matchDetails, setMatchDetails] =
     useState<MatchDetailsDisplay | null>(null)
-
   const [botAddress, setBotAddress] = useState<string | null>(null)
+
   const lastActivePotRef = useRef<string | null>(null)
 
   const isBotAddress = (address?: string | null) => {
@@ -557,6 +565,7 @@ export default function App() {
     const check = async () => {
       try {
         const playerData = await contract.players(account)
+
         if (active) {
           setMyHasRevealed(Boolean(playerData.hasRevealed))
         }
@@ -694,10 +703,11 @@ export default function App() {
 
     const cached = lastFinished
     const currentState = stateRef.current
-    
+
     // If the phase has moved past 'finished' (e.g., bot auto-restarted),
     // we MUST use the cached snapshot so the modal doesn't show empty data.
-    const preferCached = detailsSource === 'previous' || currentState.phase !== 'finished'
+    const preferCached =
+      detailsSource === 'previous' || currentState.phase !== 'finished'
 
     const activePot =
       currentState.phase === 'finished'
@@ -706,7 +716,9 @@ export default function App() {
 
     const applyCached = () => {
       if (!cached) {
-        setDetailsError('Match data is no longer available live and was not cached.')
+        setDetailsError(
+          'Match data is no longer available live and was not cached.'
+        )
         return
       }
 
@@ -747,7 +759,6 @@ export default function App() {
       )
 
       const youAddress = account
-
       let opponentAddress: string | null = null
 
       if (youIsPlayer && lowerAccount === lowerPlayer1) {
@@ -798,7 +809,7 @@ export default function App() {
         pot: activePot,
         source: 'live',
       })
-    } catch (err: any) {
+    } catch {
       applyCached()
     } finally {
       setDetailsLoading(false)
@@ -1187,798 +1198,830 @@ export default function App() {
         fontFamily: 'system-ui, sans-serif',
       }}
     >
-      <Header />
+      <style>
+        {`
+          html {
+            scroll-behavior: smooth;
+          }
 
-      <GameContainer>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            marginBottom: '1rem',
-          }}
-        >
-          <ConnectButton
-            account={account}
-            onConnect={connect}
-            onDisconnect={disconnect}
-          />
-        </div>
+          body {
+            margin: 0;
+          }
+        `}
+      </style>
 
-        {!isConnected ? (
+      <Header onPlayNow={scrollToGame} />
+
+      <div ref={gameSectionRef} style={{ scrollMarginTop: 0 }}>
+        <GameContainer>
           <div
             style={{
-              textAlign: 'center',
-              padding: '3rem',
-              color: '#888',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: '1rem',
             }}
           >
-            <p>Connect your wallet to play Outguess Duel.</p>
+            <ConnectButton
+              account={account}
+              onConnect={connect}
+              onDisconnect={disconnect}
+            />
           </div>
-        ) : (
-          <>
-            <FaucetPanel account={account} onFunded={refresh} />
 
-            <PotDisplay amount={state.pot} />
+          {!isConnected ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '3rem',
+                color: '#888',
+              }}
+            >
+              <p>Connect your wallet to play Outguess Duel.</p>
+            </div>
+          ) : (
+            <>
+              <FaucetPanel account={account} onFunded={refresh} />
+              <PotDisplay amount={state.pot} />
 
-            {currentResult &&
-              renderResultBanner({
-                result: currentResult,
-                winner: state.winner,
-                isPrevious: false,
-                details: 'current',
-              })}
+              {currentResult &&
+                renderResultBanner({
+                  result: currentResult,
+                  winner: state.winner,
+                  isPrevious: false,
+                  details: 'current',
+                })}
 
-            {previousResult && lastFinished &&
-              renderResultBanner({
-                result: previousResult,
-                winner: lastFinished.winner,
-                isPrevious: true,
-                details: 'previous',
-                onDismiss: dismissLastResult,
-              })}
+              {previousResult && lastFinished &&
+                renderResultBanner({
+                  result: previousResult,
+                  winner: lastFinished.winner,
+                  isPrevious: true,
+                  details: 'previous',
+                  onDismiss: dismissLastResult,
+                })}
 
-            {canStartNewMatch && startMode === 'menu' && !isStaked && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '0.75rem',
-                  marginBottom: '1rem',
-                }}
-              >
-                <button
-                  onClick={() => setStartMode('human')}
-                  style={{
-                    padding: '1rem',
-                    background: '#111',
-                    border: '1px solid #2563eb',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <strong
-                    style={{
-                      display: 'block',
-                      marginBottom: '0.35rem',
-                      color: '#60a5fa',
-                      fontSize: '1rem',
-                    }}
-                  >
-                    Play vs Human
-                  </strong>
-
-                  <span
-                    style={{
-                      color: '#888',
-                      fontSize: '0.8rem',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {hasExistingStake
-                      ? existingStakeIsBot
-                        ? 'Join the existing bot stake.'
-                        : 'Join the existing stake.'
-                      : 'Stake and wait for another wallet to join.'}
-                  </span>
-                </button>
-
-                <button
-                  onClick={handleChooseBot}
-                  disabled={starting}
-                  style={{
-                    padding: '1rem',
-                    background: '#111',
-                    border: '1px solid #7c3aed',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    cursor: starting ? 'not-allowed' : 'pointer',
-                    textAlign: 'left',
-                    opacity: starting ? 0.6 : 1,
-                  }}
-                >
-                  <strong
-                    style={{
-                      display: 'block',
-                      marginBottom: '0.35rem',
-                      color: '#a78bfa',
-                      fontSize: '1rem',
-                    }}
-                  >
-                    Play vs Bot
-                  </strong>
-
-                  <span
-                    style={{
-                      color: '#888',
-                      fontSize: '0.8rem',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {starting
-                      ? 'Starting bot...'
-                      : hasExistingStake
-                        ? existingStakeIsBot
-                          ? 'Bot is already staked. Stake to join it.'
-                          : 'Start bot and join the existing stake.'
-                        : 'Start the local bot and stake against it.'}
-                  </span>
-                </button>
-              </div>
-            )}
-
-            {canStartNewMatch && (startMode !== 'menu' || isStaked) && (
-              <div style={{ marginBottom: '1rem' }}>
+              {canStartNewMatch && startMode === 'menu' && !isStaked && (
                 <div
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    marginBottom: '0.75rem',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '0.75rem',
+                    marginBottom: '1rem',
                   }}
                 >
-                  <p
+                  <button
+                    onClick={() => setStartMode('human')}
                     style={{
-                      margin: 0,
-                      color: '#888',
-                      fontSize: '0.875rem',
+                      padding: '1rem',
+                      background: '#111',
+                      border: '1px solid #2563eb',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      textAlign: 'left',
                     }}
                   >
-                    {startMode === 'human'
-                      ? 'Human match selected.'
-                      : startMode === 'bot'
-                        ? 'Bot match selected.'
-                        : 'You are already staked.'}
-                  </p>
-
-                  {!isStaked && (
-                    <button
-                      onClick={() => setStartMode('menu')}
+                    <strong
                       style={{
-                        padding: '0.4rem 0.8rem',
-                        background: '#222',
-                        color: '#fff',
-                        border: '1px solid #444',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
+                        display: 'block',
+                        marginBottom: '0.35rem',
+                        color: '#60a5fa',
+                        fontSize: '1rem',
                       }}
                     >
-                      Back to options
-                    </button>
-                  )}
-                </div>
+                      Play vs Human
+                    </strong>
 
-                {startMode === 'bot' && (
-                  <p
-                    style={{
-                      margin: '0 0 0.75rem',
-                      color: '#a78bfa',
-                      fontSize: '0.8rem',
-                    }}
-                  >
-                    Bot watcher started. Stake to create or join the duel.
-                  </p>
-                )}
+                    <span
+                      style={{
+                        color: '#888',
+                        fontSize: '0.8rem',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {hasExistingStake
+                        ? existingStakeIsBot
+                          ? 'Join the existing bot stake.'
+                          : 'Join the existing stake.'
+                        : 'Stake and wait for another wallet to join.'}
+                    </span>
+                  </button>
 
-                {startMode === 'human' && (
-                  <p
-                    style={{
-                      margin: '0 0 0.75rem',
-                      color: '#60a5fa',
-                      fontSize: '0.8rem',
-                    }}
-                  >
-                    Stake, then wait for another wallet to stake the same
-                    amount.
-                  </p>
-                )}
-
-                <StakePanel
-                  onStake={handleStake}
-                  pot={state.pot}
-                  isStaked={isStaked}
-                  requiredStake={
-                    state.requiredStakeIsSet ? state.requiredStake : null
-                  }
-                  requiredStakeIsSet={state.requiredStakeIsSet}
-                />
-
-                {isStaked && startMode !== 'bot' && (
                   <button
                     onClick={handleChooseBot}
                     disabled={starting}
                     style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      marginTop: '0.75rem',
-                      background: '#7c3aed',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: starting ? 'not-allowed' : 'pointer',
-                      opacity: starting ? 0.5 : 1,
-                    }}
-                  >
-                    {starting ? 'Starting Bot...' : 'Invite Bot to Join'}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {canStartNewMatch && botError && (
-              <p
-                style={{
-                  color: '#ef4444',
-                  fontSize: '0.8rem',
-                  marginTop: 0,
-                  marginBottom: '1rem',
-                }}
-              >
-                Bot failed to start: {botError}
-              </p>
-            )}
-
-            {canUnstake && (
-              <button
-                onClick={handleUnstake}
-                disabled={unstaking}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  marginBottom: '1rem',
-                  background: '#dc2626',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: unstaking ? 'not-allowed' : 'pointer',
-                  opacity: unstaking ? 0.5 : 1,
-                }}
-              >
-                {unstaking ? 'Unstaking...' : 'Unstake'}
-              </button>
-            )}
-
-            {unstakeError && (
-              <p
-                style={{
-                  color: '#ef4444',
-                  fontSize: '0.8rem',
-                  marginTop: 0,
-                  marginBottom: '1rem',
-                }}
-              >
-                Unstake failed: {unstakeError}
-              </p>
-            )}
-
-            {state.phase === 'commit' && (
-              <>
-                <GameTimer
-                  endTime={state.commitDeadline}
-                  label="Commit Window"
-                />
-
-                {!commitWindowOver ? (
-                  <CommitForm
-                    onCommit={handleCommit}
-                    hashPreview={lastHash}
-                  />
-                ) : (
-                  <div
-                    style={{
                       padding: '1rem',
-                      border: '1px solid #7f1d1d',
+                      background: '#111',
+                      border: '1px solid #7c3aed',
                       borderRadius: '8px',
-                      marginBottom: '1rem',
-                      color: '#ef4444',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    Commit window expired. Use claim timeout to resolve or
-                    reset the duel.
-                    <br />
-                    <br />
-                    If both players committed, this moves the match to Reveal.
-                    <br />
-                    If only one player committed, that player can claim the
-                    win.
-                    <br />
-                    If neither player committed, the match can be refunded and
-                    reset.
-                  </div>
-                )}
-
-                {commitWindowOver && (
-                  <button
-                    onClick={handleClaimTimeout}
-                    disabled={!canClaimCommitTimeout}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      background: canClaimCommitTimeout ? '#dc2626' : '#444',
                       color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: canClaimCommitTimeout
-                        ? 'pointer'
-                        : 'not-allowed',
-                      opacity: canClaimCommitTimeout ? 1 : 0.5,
+                      cursor: starting ? 'not-allowed' : 'pointer',
+                      textAlign: 'left',
+                      opacity: starting ? 0.6 : 1,
                     }}
                   >
-                    {commitClaimLabel}
-                  </button>
-                )}
-              </>
-            )}
+                    <strong
+                      style={{
+                        display: 'block',
+                        marginBottom: '0.35rem',
+                        color: '#a78bfa',
+                        fontSize: '1rem',
+                      }}
+                    >
+                      Play vs Bot
+                    </strong>
 
-            {state.phase === 'reveal' && (
-              <>
-                <GameTimer
-                  endTime={state.revealDeadline}
-                  label="Reveal Window"
-                />
-
-                {!revealWindowOver ? (
-                  <div
-                    style={{
-                      padding: '1.5rem',
-                      border: '1px solid #333',
-                      borderRadius: '8px',
-                      marginBottom: '1rem',
-                    }}
-                  >
-                    <h3 style={{ marginTop: 0 }}>Reveal Phase</h3>
-
-                    <p
+                    <span
                       style={{
                         color: '#888',
-                        fontSize: '0.875rem',
+                        fontSize: '0.8rem',
+                        lineHeight: 1.4,
                       }}
                     >
-                      Reveal your original numbers to verify your commit.
-                    </p>
+                      {starting
+                        ? 'Starting bot...'
+                        : hasExistingStake
+                          ? existingStakeIsBot
+                            ? 'Bot is already staked. Stake to join it.'
+                            : 'Start bot and join the existing stake.'
+                          : 'Start the local bot and stake against it.'}
+                    </span>
+                  </button>
+                </div>
+              )}
 
-                    {storedCommit ? (
-                      <p
-                        style={{
-                          color: '#22c55e',
-                          fontSize: '0.875rem',
-                          marginBottom: '1rem',
-                        }}
-                      >
-                        Saved commit found. Confirm reveal below.
-                      </p>
-                    ) : (
-                      <p
-                        style={{
-                          color: '#ef4444',
-                          fontSize: '0.875rem',
-                          marginBottom: '1rem',
-                        }}
-                      >
-                        No saved commit found. You must enter the exact secret,
-                        guess, and salt used during commit.
-                      </p>
-                    )}
-
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.875rem',
-                      }}
-                    >
-                      Your Secret Number
-                    </label>
-
-                    <input
-                      type="number"
-                      value={revealSecret}
-                      onChange={(e) => setRevealSecret(e.target.value)}
-                      readOnly={Boolean(storedCommit)}
-                      style={revealInputStyle}
-                    />
-
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.875rem',
-                      }}
-                    >
-                      Your Guess
-                    </label>
-
-                    <input
-                      type="number"
-                      value={revealGuess}
-                      onChange={(e) => setRevealGuess(e.target.value)}
-                      readOnly={Boolean(storedCommit)}
-                      style={revealInputStyle}
-                    />
-
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.875rem',
-                      }}
-                    >
-                      Salt
-                    </label>
-
-                    <input
-                      type="text"
-                      value={revealSalt}
-                      onChange={(e) => setRevealSalt(e.target.value)}
-                      readOnly={Boolean(storedCommit)}
-                      style={{
-                        ...revealInputStyle,
-                        fontSize: '0.75rem',
-                      }}
-                    />
-
-                    <button
-                      onClick={handleReveal}
-                      disabled={revealDisabled}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        background: '#22c55e',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        opacity: revealDisabled ? 0.5 : 1,
-                      }}
-                    >
-                      {storedCommit ? 'Confirm Saved Reveal' : 'Reveal'}
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      padding: '1rem',
-                      border: '1px solid #7f1d1d',
-                      borderRadius: '8px',
-                      marginBottom: '1rem',
-                      color: '#ef4444',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    Reveal window expired.
-                    <br />
-                    <br />
-                    If both players revealed, claim timeout can finalize the
-                    match.
-                    <br />
-                    If only one player revealed, that player can claim the
-                    win.
-                    <br />
-                    If neither player revealed, the match can be refunded and
-                    reset.
-                  </div>
-                )}
-
-                <button
-                  onClick={handleClaimTimeout}
-                  disabled={!canClaimRevealTimeout}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: canClaimRevealTimeout ? '#dc2626' : '#444',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: canClaimRevealTimeout ? 'pointer' : 'not-allowed',
-                    marginTop: '0.5rem',
-                    opacity: canClaimRevealTimeout ? 1 : 0.5,
-                  }}
-                >
-                  {claimButtonLabel}
-                </button>
-              </>
-            )}
-
-            <div
-              style={{
-                marginTop: '1.5rem',
-                padding: '1rem',
-                background: '#111',
-                borderRadius: '4px',
-                fontSize: '0.75rem',
-                color: '#666',
-              }}
-            >
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Phase:</strong> {state.phase}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>You:</strong> {account?.slice(0, 10)}...
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>P1:</strong> {state.player1?.slice(0, 10) ?? 'None'}
-                ... | <strong>P2:</strong>{' '}
-                {state.player2?.slice(0, 10) ?? 'None'}...
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Bot Address:</strong>{' '}
-                {botAddress ? `${botAddress.slice(0, 10)}...` : 'Unknown'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Start Mode:</strong> {startMode}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Commit Deadline:</strong>{' '}
-                {state.commitDeadline ?? 'None'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Reveal Deadline:</strong>{' '}
-                {state.revealDeadline ?? 'None'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Now:</strong> {now}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Commit Window Over:</strong>{' '}
-                {commitWindowOver ? 'Yes' : 'No'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Reveal Window Over:</strong>{' '}
-                {revealWindowOver ? 'Yes' : 'No'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Has Committed:</strong>{' '}
-                {myHasCommitted ? 'Yes' : 'No'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Has Revealed:</strong> {myHasRevealed ? 'Yes' : 'No'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Saved Commit:</strong> {storedCommit ? 'Yes' : 'No'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Current Winner:</strong>{' '}
-                {state.winner ?? 'None / Tie'}
-              </p>
-
-              <p style={{ margin: '0 0 0.25rem' }}>
-                <strong>Last Saved Winner:</strong>{' '}
-                {lastFinished ? lastFinished.winner ?? 'Tie' : 'None'}
-              </p>
-
-              <p style={{ margin: 0 }}>
-                <strong>Can Claim Timeout:</strong>{' '}
-                {canClaimTimeout ? 'Yes' : 'No'}
-              </p>
-            </div>
-
-            {detailsSource !== null && (
-              <div style={overlayStyle} onClick={() => setDetailsSource(null)}>
-                <div
-                  style={modalStyle}
-                  onClick={(event) => event.stopPropagation()}
-                >
+              {canStartNewMatch && (startMode !== 'menu' || isStaked) && (
+                <div style={{ marginBottom: '1rem' }}>
                   <div
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: '1rem',
+                      gap: '0.5rem',
+                      marginBottom: '0.75rem',
                     }}
                   >
-                    <h3 style={{ margin: 0 }}>Match Details</h3>
-
-                    <button
-                      onClick={() => setDetailsSource(null)}
-                      style={smallButtonStyle}
-                    >
-                      Close
-                    </button>
-                  </div>
-
-                  {detailsLoading && (
-                    <p style={{ color: '#888' }}>Loading match details...</p>
-                  )}
-
-                  {detailsError && (
                     <p
                       style={{
+                        margin: 0,
+                        color: '#888',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      {startMode === 'human'
+                        ? 'Human match selected.'
+                        : startMode === 'bot'
+                          ? 'Bot match selected.'
+                          : 'You are already staked.'}
+                    </p>
+
+                    {!isStaked && (
+                      <button
+                        onClick={() => setStartMode('menu')}
+                        style={{
+                          padding: '0.4rem 0.8rem',
+                          background: '#222',
+                          color: '#fff',
+                          border: '1px solid #444',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        Back to options
+                      </button>
+                    )}
+                  </div>
+
+                  {startMode === 'bot' && (
+                    <p
+                      style={{
+                        margin: '0 0 0.75rem',
+                        color: '#a78bfa',
+                        fontSize: '0.8rem',
+                      }}
+                    >
+                      Bot watcher started. Stake to create or join the duel.
+                    </p>
+                  )}
+
+                  {startMode === 'human' && (
+                    <p
+                      style={{
+                        margin: '0 0 0.75rem',
+                        color: '#60a5fa',
+                        fontSize: '0.8rem',
+                      }}
+                    >
+                      Stake, then wait for another wallet to stake the same
+                      amount.
+                    </p>
+                  )}
+
+                  <StakePanel
+                    onStake={handleStake}
+                    pot={state.pot}
+                    isStaked={isStaked}
+                    requiredStake={
+                      state.requiredStakeIsSet ? state.requiredStake : null
+                    }
+                    requiredStakeIsSet={state.requiredStakeIsSet}
+                  />
+
+                  {isStaked && startMode !== 'bot' && (
+                    <button
+                      onClick={handleChooseBot}
+                      disabled={starting}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        marginTop: '0.75rem',
+                        background: '#7c3aed',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: starting ? 'not-allowed' : 'pointer',
+                        opacity: starting ? 0.5 : 1,
+                      }}
+                    >
+                      {starting ? 'Starting Bot...' : 'Invite Bot to Join'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {canStartNewMatch && botError && (
+                <p
+                  style={{
+                    color: '#ef4444',
+                    fontSize: '0.8rem',
+                    marginTop: 0,
+                    marginBottom: '1rem',
+                  }}
+                >
+                  Bot failed to start: {botError}
+                </p>
+              )}
+
+              {canUnstake && (
+                <button
+                  onClick={handleUnstake}
+                  disabled={unstaking}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                    background: '#dc2626',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: unstaking ? 'not-allowed' : 'pointer',
+                    opacity: unstaking ? 0.5 : 1,
+                  }}
+                >
+                  {unstaking ? 'Unstaking...' : 'Unstake'}
+                </button>
+              )}
+
+              {unstakeError && (
+                <p
+                  style={{
+                    color: '#ef4444',
+                    fontSize: '0.8rem',
+                    marginTop: 0,
+                    marginBottom: '1rem',
+                  }}
+                >
+                  Unstake failed: {unstakeError}
+                </p>
+              )}
+
+              {state.phase === 'commit' && (
+                <>
+                  <GameTimer
+                    endTime={state.commitDeadline}
+                    label="Commit Window"
+                  />
+
+                  {!commitWindowOver ? (
+                    <CommitForm
+                      onCommit={handleCommit}
+                      hashPreview={lastHash}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        padding: '1rem',
+                        border: '1px solid #7f1d1d',
+                        borderRadius: '8px',
+                        marginBottom: '1rem',
                         color: '#ef4444',
                         fontSize: '0.875rem',
                       }}
                     >
-                      {detailsError}
-                    </p>
+                      Commit window expired. Use claim timeout to resolve or
+                      reset the duel.
+                      <br />
+                      <br />
+                      If both players committed, this moves the match to Reveal.
+                      <br />
+                      If only one player committed, that player can claim the
+                      win.
+                      <br />
+                      If neither player committed, the match can be refunded and
+                      reset.
+                    </div>
                   )}
 
-                  {!detailsLoading && !detailsError && matchDetails && (
-                    <>
-                      {modalSource === 'cached' && (
+                  {commitWindowOver && (
+                    <button
+                      onClick={handleClaimTimeout}
+                      disabled={!canClaimCommitTimeout}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        background: canClaimCommitTimeout ? '#dc2626' : '#444',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: canClaimCommitTimeout
+                          ? 'pointer'
+                          : 'not-allowed',
+                        opacity: canClaimCommitTimeout ? 1 : 0.5,
+                      }}
+                    >
+                      {commitClaimLabel}
+                    </button>
+                  )}
+                </>
+              )}
+
+              {state.phase === 'reveal' && (
+                <>
+                  <GameTimer
+                    endTime={state.revealDeadline}
+                    label="Reveal Window"
+                  />
+
+                  {!revealWindowOver ? (
+                    <div
+                      style={{
+                        padding: '1.5rem',
+                        border: '1px solid #333',
+                        borderRadius: '8px',
+                        marginBottom: '1rem',
+                      }}
+                    >
+                      <h3 style={{ marginTop: 0 }}>Reveal Phase</h3>
+
+                      <p
+                        style={{
+                          color: '#888',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        Reveal your original numbers to verify your commit.
+                      </p>
+
+                      {storedCommit ? (
                         <p
                           style={{
-                            color: '#eab308',
-                            fontSize: '0.8rem',
-                            marginTop: 0,
+                            color: '#22c55e',
+                            fontSize: '0.875rem',
                             marginBottom: '1rem',
                           }}
                         >
-                          Showing saved result from session storage. The live
-                          contract state may have already reset.
+                          Saved commit found. Confirm reveal below.
+                        </p>
+                      ) : (
+                        <p
+                          style={{
+                            color: '#ef4444',
+                            fontSize: '0.875rem',
+                            marginBottom: '1rem',
+                          }}
+                        >
+                          No saved commit found. You must enter the exact secret,
+                          guess, and salt used during commit.
                         </p>
                       )}
 
-                      <div
+                      <label
                         style={{
-                          ...modalCardStyle,
-                          marginBottom: '0.75rem',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          fontSize: '0.875rem',
                         }}
                       >
-                        <p style={modalLabelStyle}>Contract</p>
+                        Your Secret Number
+                      </label>
+                      <input
+                        type="number"
+                        value={revealSecret}
+                        onChange={(e) => setRevealSecret(e.target.value)}
+                        readOnly={Boolean(storedCommit)}
+                        style={revealInputStyle}
+                      />
 
-                        <p style={{ margin: '0 0 0.5rem' }}>
-                          <strong>Contract Address:</strong>
-                          <br />
-                          <span style={breakAllStyle}>
-                            {CONFIG.contractAddress}
-                          </span>
-                        </p>
-
-                        <p style={{ margin: '0 0 0.5rem' }}>
-                          <strong>Phase:</strong> {state.phase}
-                        </p>
-
-                        <p style={{ margin: '0 0 0.5rem' }}>
-                          <strong>Match Pot:</strong> {modalPot} ETH
-                        </p>
-
-                        <p style={{ margin: '0 0 0.5rem' }}>
-                          <strong>Winner:</strong> {modalWinnerLabel}
-                        </p>
-
-                        <p style={{ margin: '0 0 0.5rem' }}>
-                          <strong>Match Player 1:</strong>{' '}
-                          {formatPlayerAddress(displayPlayer1)}
-                        </p>
-
-                        <p style={{ margin: 0 }}>
-                          <strong>Match Player 2:</strong>{' '}
-                          {formatPlayerAddress(displayPlayer2)}
-                        </p>
-                      </div>
-
-                      <div
+                      <label
                         style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: '0.75rem',
-                          marginBottom: '0.75rem',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          fontSize: '0.875rem',
                         }}
                       >
-                        {renderDetailsPlayerCard(modalYouLabel, modalYou)}
-                        {renderDetailsPlayerCard(
-                          modalOpponentLabel,
-                          modalOpponent
-                        )}
-                      </div>
+                        Your Guess
+                      </label>
+                      <input
+                        type="number"
+                        value={revealGuess}
+                        onChange={(e) => setRevealGuess(e.target.value)}
+                        readOnly={Boolean(storedCommit)}
+                        style={revealInputStyle}
+                      />
 
-                      <div style={modalCardStyle}>
-                        <p style={modalLabelStyle}>
-                          Contract Result Calculation
-                        </p>
+                      <label
+                        style={{
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        Salt
+                      </label>
+                      <input
+                        type="text"
+                        value={revealSalt}
+                        onChange={(e) => setRevealSalt(e.target.value)}
+                        readOnly={Boolean(storedCommit)}
+                        style={{
+                          ...revealInputStyle,
+                          fontSize: '0.75rem',
+                        }}
+                      />
 
-                        {modalCanCalculate ? (
-                          <>
-                            <p style={{ margin: '0 0 0.5rem' }}>
-                              Your distance:{' '}
-                              <code>
-                                |{modalYou?.guess} - {modalOpponent?.secret}|
-                                = {modalYourDistance?.toString()}
-                              </code>
-                            </p>
+                      <button
+                        onClick={handleReveal}
+                        disabled={revealDisabled}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          background: '#22c55e',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          opacity: revealDisabled ? 0.5 : 1,
+                        }}
+                      >
+                        {storedCommit ? 'Confirm Saved Reveal' : 'Reveal'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '1rem',
+                        border: '1px solid #7f1d1d',
+                        borderRadius: '8px',
+                        marginBottom: '1rem',
+                        color: '#ef4444',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      Reveal window expired.
+                      <br />
+                      <br />
+                      If both players revealed, claim timeout can finalize the
+                      match.
+                      <br />
+                      If only one player revealed, that player can claim the
+                      win.
+                      <br />
+                      If neither player revealed, the match can be refunded and
+                      reset.
+                    </div>
+                  )}
 
-                            <p style={{ margin: '0 0 0.5rem' }}>
-                              {modalOpponentIsBot ? 'Bot distance' : 'Opponent distance'}:{' '}
-                              <code>
-                                |{modalOpponent?.guess} - {modalYou?.secret}|
-                                = {modalOpponentDistance?.toString()}
-                              </code>
-                            </p>
+                  <button
+                    onClick={handleClaimTimeout}
+                    disabled={!canClaimRevealTimeout}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      background: canClaimRevealTimeout ? '#dc2626' : '#444',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: canClaimRevealTimeout ? 'pointer' : 'not-allowed',
+                      marginTop: '0.5rem',
+                      opacity: canClaimRevealTimeout ? 1 : 0.5,
+                    }}
+                  >
+                    {claimButtonLabel}
+                  </button>
+                </>
+              )}
 
-                            <p
-                              style={{
-                                margin: '0 0 0.5rem',
-                                color: '#888',
-                              }}
-                            >
-                              Smaller distance wins. If distances are equal,
-                              the pot is split.
-                            </p>
+              <div style={{ marginTop: '1.5rem' }}>
+                <button
+                  onClick={() => setShowDebugInfo((prev) => !prev)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: '#222',
+                    color: '#888',
+                    border: '1px solid #444',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {showDebugInfo
+                    ? 'Hide Technical Details'
+                    : 'Show Technical Details'}
+                </button>
 
-                            <p style={{ margin: 0 }}>
-                              <strong>Result:</strong>{' '}
-                              {modalWinner
-                                ? modalWinnerIsYou
-                                  ? 'You had the smaller distance.'
-                                  : modalWinnerIsBot
-                                    ? 'Bot had the smaller distance.'
-                                    : modalWinnerIsOpponent
-                                      ? 'Opponent had the smaller distance.'
-                                      : 'Winner determined by contract.'
-                                : 'Distance tie — pot split.'}
-                            </p>
-                          </>
-                        ) : (
-                          <p style={{ margin: 0, color: '#888' }}>
-                            Full secret/guess values are readable after both
-                            players reveal and before the contract resets. If
-                            a new match has started, old values may have been
-                            cleared.
+                {showDebugInfo && (
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      padding: '1rem',
+                      background: '#111',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      color: '#666',
+                    }}
+                  >
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Phase:</strong> {state.phase}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>You:</strong> {account?.slice(0, 10)}...
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>P1:</strong> {state.player1?.slice(0, 10) ?? 'None'}
+                      ... | <strong>P2:</strong>{' '}
+                      {state.player2?.slice(0, 10) ?? 'None'}...
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Bot Address:</strong>{' '}
+                      {botAddress ? `${botAddress.slice(0, 10)}...` : 'Unknown'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Start Mode:</strong> {startMode}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Commit Deadline:</strong>{' '}
+                      {state.commitDeadline ?? 'None'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Reveal Deadline:</strong>{' '}
+                      {state.revealDeadline ?? 'None'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Now:</strong> {now}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Commit Window Over:</strong>{' '}
+                      {commitWindowOver ? 'Yes' : 'No'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Reveal Window Over:</strong>{' '}
+                      {revealWindowOver ? 'Yes' : 'No'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Has Committed:</strong>{' '}
+                      {myHasCommitted ? 'Yes' : 'No'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Has Revealed:</strong> {myHasRevealed ? 'Yes' : 'No'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Saved Commit:</strong> {storedCommit ? 'Yes' : 'No'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Current Winner:</strong>{' '}
+                      {state.winner ?? 'None / Tie'}
+                    </p>
+
+                    <p style={{ margin: '0 0 0.25rem' }}>
+                      <strong>Last Saved Winner:</strong>{' '}
+                      {lastFinished ? lastFinished.winner ?? 'Tie' : 'None'}
+                    </p>
+
+                    <p style={{ margin: 0 }}>
+                      <strong>Can Claim Timeout:</strong>{' '}
+                      {canClaimTimeout ? 'Yes' : 'No'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {detailsSource !== null && (
+                <div style={overlayStyle} onClick={() => setDetailsSource(null)}>
+                  <div
+                    style={modalStyle}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '1rem',
+                      }}
+                    >
+                      <h3 style={{ margin: 0 }}>Match Details</h3>
+
+                      <button
+                        onClick={() => setDetailsSource(null)}
+                        style={smallButtonStyle}
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    {detailsLoading && (
+                      <p style={{ color: '#888' }}>Loading match details...</p>
+                    )}
+
+                    {detailsError && (
+                      <p
+                        style={{
+                          color: '#ef4444',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        {detailsError}
+                      </p>
+                    )}
+
+                    {!detailsLoading && !detailsError && matchDetails && (
+                      <>
+                        {modalSource === 'cached' && (
+                          <p
+                            style={{
+                              color: '#eab308',
+                              fontSize: '0.8rem',
+                              marginTop: 0,
+                              marginBottom: '1rem',
+                            }}
+                          >
+                            Showing saved result from session storage. The live
+                            contract state may have already reset.
                           </p>
                         )}
-                      </div>
 
-                      <div style={{ marginTop: '1rem' }}>
-                        <button
-                          onClick={() => void loadMatchDetails()}
-                          disabled={detailsLoading}
+                        <div
                           style={{
-                            padding: '0.5rem 1rem',
-                            background: '#2563eb',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            opacity: detailsLoading ? 0.5 : 1,
+                            ...modalCardStyle,
+                            marginBottom: '0.75rem',
                           }}
                         >
-                          Refresh Details
-                        </button>
-                      </div>
-                    </>
-                  )}
+                          <p style={modalLabelStyle}>Contract</p>
+
+                          <p style={{ margin: '0 0 0.5rem' }}>
+                            <strong>Contract Address:</strong>
+                            <br />
+                            <span style={breakAllStyle}>
+                              {CONFIG.contractAddress}
+                            </span>
+                          </p>
+
+                          <p style={{ margin: '0 0 0.5rem' }}>
+                            <strong>Phase:</strong> {state.phase}
+                          </p>
+
+                          <p style={{ margin: '0 0 0.5rem' }}>
+                            <strong>Match Pot:</strong> {modalPot} ETH
+                          </p>
+
+                          <p style={{ margin: '0 0 0.5rem' }}>
+                            <strong>Winner:</strong> {modalWinnerLabel}
+                          </p>
+
+                          <p style={{ margin: '0 0 0.5rem' }}>
+                            <strong>Match Player 1:</strong>{' '}
+                            {formatPlayerAddress(displayPlayer1)}
+                          </p>
+
+                          <p style={{ margin: 0 }}>
+                            <strong>Match Player 2:</strong>{' '}
+                            {formatPlayerAddress(displayPlayer2)}
+                          </p>
+                        </div>
+
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '0.75rem',
+                            marginBottom: '0.75rem',
+                          }}
+                        >
+                          {renderDetailsPlayerCard(modalYouLabel, modalYou)}
+                          {renderDetailsPlayerCard(
+                            modalOpponentLabel,
+                            modalOpponent
+                          )}
+                        </div>
+
+                        <div style={modalCardStyle}>
+                          <p style={modalLabelStyle}>
+                            Contract Result Calculation
+                          </p>
+
+                          {modalCanCalculate ? (
+                            <>
+                              <p style={{ margin: '0 0 0.5rem' }}>
+                                Your distance:{' '}
+                                <code>
+                                  |{modalYou?.guess} - {modalOpponent?.secret}|
+                                  = {modalYourDistance?.toString()}
+                                </code>
+                              </p>
+
+                              <p style={{ margin: '0 0 0.5rem' }}>
+                                {modalOpponentIsBot ? 'Bot distance' : 'Opponent distance'}:{' '}
+                                <code>
+                                  |{modalOpponent?.guess} - {modalYou?.secret}|
+                                  = {modalOpponentDistance?.toString()}
+                                </code>
+                              </p>
+
+                              <p
+                                style={{
+                                  margin: '0 0 0.5rem',
+                                  color: '#888',
+                                }}
+                              >
+                                Smaller distance wins. If distances are equal,
+                                the pot is split.
+                              </p>
+
+                              <p style={{ margin: 0 }}>
+                                <strong>Result:</strong>{' '}
+                                {modalWinner
+                                  ? modalWinnerIsYou
+                                    ? 'You had the smaller distance.'
+                                    : modalWinnerIsBot
+                                      ? 'Bot had the smaller distance.'
+                                      : modalWinnerIsOpponent
+                                        ? 'Opponent had the smaller distance.'
+                                        : 'Winner determined by contract.'
+                                  : 'Distance tie — pot split.'}
+                              </p>
+                            </>
+                          ) : (
+                            <p style={{ margin: 0, color: '#888' }}>
+                              Full secret/guess values are readable after both
+                              players reveal and before the contract resets. If
+                              a new match has started, old values may have been
+                              cleared.
+                            </p>
+                          )}
+                        </div>
+
+                        <div style={{ marginTop: '1rem' }}>
+                          <button
+                            onClick={() => void loadMatchDetails()}
+                            disabled={detailsLoading}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#2563eb',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              opacity: detailsLoading ? 0.5 : 1,
+                            }}
+                          >
+                            Refresh Details
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </GameContainer>
+              )}
+            </>
+          )}
+        </GameContainer>
+      </div>
     </div>
   )
 }
