@@ -6,7 +6,14 @@ interface Props {
 
 export default function GameContainer({ children }: Props) {
   return (
-    <main style={{ maxWidth: '640px', margin: '2rem auto', padding: '0 1rem' }}>
+    <main
+      style={{
+        maxWidth: '640px',
+        margin: '0 auto',
+        padding: '0 1rem',
+        width: '100%',
+      }}
+    >
       {children}
     </main>
   )

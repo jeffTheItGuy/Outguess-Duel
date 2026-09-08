@@ -14,7 +14,8 @@ import { CONFIG } from '@/config'
 import ABI from '@/abi/OutguessDuel.json'
 import Header from '@/components/layout/Header'
 import GameContainer from '@/components/layout/GameContainer'
-import ConnectButton from '@/components/wallet/ConnectButton'
+import HowToPlay from '@/components/layout/HowToPlay'
+import ConnectPrompt from '@/components/wallet/ConnectPrompt'
 import FaucetPanel from '@/components/game/FaucetPanel'
 import StakePanel from '@/components/game/StakePanel'
 import CommitForm from '@/components/game/CommitForm'
@@ -266,7 +267,7 @@ const breakAllStyle: CSSProperties = {
   wordBreak: 'break-all',
 }
 
-const resultBannerStyles: Record<
+const resultBannerStyles: Record <
   'win' | 'lose' | 'tie',
   { bg: string; text: string }
 > = {
@@ -1212,7 +1213,18 @@ export default function App() {
 
       <Header onPlayNow={scrollToGame} />
 
-      <div ref={gameSectionRef} style={{ scrollMarginTop: 0 }}>
+      <div
+        ref={gameSectionRef}
+        style={{
+          scrollMarginTop: 0,
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          boxSizing: 'border-box',
+          padding: '2rem 0',
+        }}
+      >
         <GameContainer>
           <div
             style={{
@@ -1221,23 +1233,13 @@ export default function App() {
               marginBottom: '1rem',
             }}
           >
-            <ConnectButton
-              account={account}
-              onConnect={connect}
-              onDisconnect={disconnect}
-            />
           </div>
 
           {!isConnected ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '3rem',
-                color: '#888',
-              }}
-            >
-              <p>Connect your wallet to play Outguess Duel.</p>
-            </div>
+            <>
+              <ConnectPrompt onConnect={connect} />
+              <HowToPlay />
+            </>
           ) : (
             <>
               <FaucetPanel account={account} onFunded={refresh} />

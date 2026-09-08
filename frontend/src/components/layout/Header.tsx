@@ -71,7 +71,6 @@ export default function Header({ onPlayNow }: Props) {
           fontSize: '1.75rem',
         }}
       >
-        ↓
       </div>
     </header>
   )

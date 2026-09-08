@@ -31,7 +31,7 @@ export default function FaucetPanel({ account, onFunded }: Props) {
 
   return (
     <div style={{ padding: '1rem', border: '1px dashed #444', borderRadius: '8px', marginBottom: '1rem', background: '#111' }}>
-      <h4 style={{ margin: '0 0 0.5rem', color: '#f59e0b', fontSize: '0.9rem' }}>🚰 Local Hardhat Faucet</h4>
+      <h4 style={{ margin: '0 0 0.5rem', color: '#f59e0b', fontSize: '0.9rem' }}>Local Hardhat Faucet</h4>
       <p style={{ margin: '0 0 0.75rem', color: '#888', fontSize: '0.75rem' }}>
         Get test ETH to pay for gas and stakes.
       </p>
